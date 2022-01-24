@@ -1,4 +1,4 @@
-typedef enum {Waiting, Running, Killed, Done} State;
+typedef enum {Waiting, Running, Killed} State;
 
 typedef struct task_s {
 	void* (*function)(void**);
@@ -37,4 +37,5 @@ typedef struct worker_s
 	int id;
 	State state;
 	Queue* task_q;
+	int error;
 } Worker;

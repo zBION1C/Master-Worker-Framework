@@ -15,7 +15,7 @@ Queue* Allocate_queue() {
    q_p->enqueued = q_p->dequeued = 0;
    q_p->front_p = NULL;
    q_p->tail_p = NULL;
-   pthread_mutex_init(&(q_p->lock), NULL);
+   pthread_mutex_init(&(q_p->lock), NULL);   
    return q_p;
 }  /* Allocate_queue */
 

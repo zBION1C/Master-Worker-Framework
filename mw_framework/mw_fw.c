@@ -12,6 +12,8 @@ void mw_init(void){
 	// Allocazione coda client
 	client_q = Allocate_queue();
 
+	sem_init(&client_sem, 0, 0);
+
 	master_handle = malloc(sizeof(pthread_t));
 	pthread_create(&master_handle[0], NULL, wait_master, (void*) master);
 }
@@ -69,12 +71,8 @@ Task* create_task(void* function, void** args, int n_args)
 void gather(void* result)
 {
 	Task* res = malloc(sizeof(Task));
-	int q_size = client_q->enqueued - client_q->dequeued; 
 
-	// Se la coda del client e' vuota, aspetta e monitora la sua dimensione...
-	while (q_size <= 0){
-		q_size = client_q->enqueued - client_q->dequeued;
-	}
+	sem_wait(&client_sem);
 
 	// Appena c'e un elemento raccoglilo e ritorna
 	pthread_mutex_lock(&client_q->lock);

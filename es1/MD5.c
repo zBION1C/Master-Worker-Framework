@@ -6,13 +6,14 @@
 #include "../mw_framework/mw_fw.c"
 #include "../timer.h"
 
-#define BUFF 10
+int buff;
+size_t length;
 
 long perm()
 {
     long y = 0;
     long x = 1;
-    for(int i=0;i<BUFF;i++)
+    for(int i=0;i<length;i++)
         x = 10*x;
     y = y + x;  
     return y;
@@ -20,7 +21,7 @@ long perm()
 
 void zeros_padding(unsigned char* c)
 {
-    int zeros = BUFF-strlen((char*)c);
+    int zeros = length-strlen((char*)c);
     char* x = malloc(zeros * sizeof(char));
     for(int i=0;i<zeros;i++)
         x[i] = '0';
@@ -31,11 +32,24 @@ void zeros_padding(unsigned char* c)
 
 unsigned char* bruteforce(void** args)
 {
-    long min = (long) args[0];
-    long max = (long) args[1]; 
-    unsigned char* hash = (unsigned char*) args[2]; 
+    /* Esclusivamente per la simulazione di errori
+    static cnt = 0;
+    Worker * w = (Worker*) args[0]; 
 
-    unsigned char *c = malloc(BUFF * sizeof(char));
+    if (cnt <= 2) {
+        cnt++;
+        pthread_mutex_lock(&w->lock);
+        w->error = 1;
+        pthread_mutex_unlock(&w->lock);
+    }
+    */
+
+    /* inizio funzione effettiva */
+    long min = (long) args[1];
+    long max = (long) args[2]; 
+    unsigned char* hash = (unsigned char*) args[3]; 
+
+    unsigned char *c = malloc(length * sizeof(char));
     int err = 0;
     unsigned char hash2[MD4_DIGEST_LENGTH];
 
@@ -61,24 +75,26 @@ int main(int argc, char const *argv[])
 {
     double start, finish, elapsed;
     int workers = strtol(argv[1], NULL, 10);
-    unsigned char* data1 = argv[2]; 
+    unsigned char* data1 = argv[2];
+    buff = strtol(argv[3], NULL, 10);
     
     mw_init();
     
     unsigned char hash1[MD4_DIGEST_LENGTH];
     
+    length = strlen((char*)data1); 
+    
     long n = perm();
 
     zeros_padding(data1);
-    size_t length = strlen((char*)data1); 
-    
+
     MD4(data1, length, hash1);
 
     void* args1[3];
     Task* task1;
 
     int min = 0;
-    int max = n;
+    long max = n;
 
     GET_TIME(start);
 
@@ -87,11 +103,11 @@ int main(int argc, char const *argv[])
    	args1[2] = (void*) hash1;
    	task1 = create_task(bruteforce, args1, 3);
 
-    change_alloc_mode(STATIC);
+    //change_alloc_mode(STATIC);
 
 	allocate_master(task1, workers);
 
-    char result[BUFF];
+    char result[buff];
 
     gather(result);
     printf("il PIN e': %s\n", result);

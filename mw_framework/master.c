@@ -1,5 +1,5 @@
 #include "master.h"
-#define STD_DYNAMIC_ALLOC 10000
+#define CHUNKSIZE 1000
 
 Task* create_task(void* function, void** args, int n_args);
 
@@ -71,6 +71,9 @@ void send_to_client(void* value)
 	pthread_mutex_lock(&client_q->lock);
 	Enqueue(client_q, *result);
 	pthread_mutex_unlock(&client_q->lock);
+
+	sem_post(&client_sem);
+
 }
 
 /*Funzione nella quale il master aspetta il completamento dei workers per la raccolta dei risultati parziali*/
@@ -128,6 +131,7 @@ void create_workers(Worker* handle[], int n)
 		worker->id = i;
 		worker->state = 0;
 		worker->task_q = Allocate_queue();
+		worker->error = 0;
 		pthread_mutex_init(&(worker->lock), NULL);
 
 		handle[i] = worker;
@@ -162,8 +166,8 @@ void allocate_task(Worker* handle[], Task* task, int mode)
 	
 	// Calcolo del workload totale
 	workload = args[1] - args[0];
-	
-	if (mode == STATIC) { // Se modalita scelta statica
+
+	if (mode == DEFAULT) { // Se modalita scelta statica
 
 		// Suddivisione statica del workload tra i vari workers
 		local_workload = workload/n_workers;
@@ -175,55 +179,61 @@ void allocate_task(Worker* handle[], Task* task, int mode)
 			min = local_workload * i;
 			max = min + local_workload;
 
+
 			// Se la divisione ha un resto diverso da 0, a tutti i workers con id <= remainder viene assegnata un iterazione in piu
 			if (i < remainder)
 				max += 1;
-			
-			void** sub_args = malloc(sizeof(void*)*n_args);
 
-			// Oltre ai primi due argomenti, i restanti argomenti rimangono inviariati
-			sub_args[0] = (void*) min;
-			sub_args[1] = (void*) max;
-			for (int k = 2; k < n_args; k++){
-				sub_args[k] = args[k];
+			void** sub_args = malloc(sizeof(void*)*(n_args+1));
+			Task* sub_task; 
+
+			// Oltre ai primi tre argomenti, i restanti argomenti rimangono inviariati
+			sub_args[0] = (void*) w;
+			sub_args[1] = (void*) min;
+			sub_args[2] = (void*) max;
+
+			for (int k = 3; k <= n_args; k++){
+				sub_args[k] = args[k-1];
 			}
 
-			Task* sub_task = create_task(function, sub_args, n_args);
+			sub_task = create_task(function, sub_args, n_args+1);
+			
 
 			pthread_mutex_lock(&w->task_q->lock);
 			Enqueue(w->task_q, *sub_task);
 			pthread_mutex_unlock(&w->task_q->lock);
 		}
-	} else if (mode == DYNAMIC) {
+	} else if (mode == STATIC) {
 
 		while (workload > 0) {
 			for (int i = 0; i < n_workers; i++){
 				Worker* w = handle[i];
 				
-				if (workload >= STD_DYNAMIC_ALLOC){
-					workload -= STD_DYNAMIC_ALLOC;
-					max = min + STD_DYNAMIC_ALLOC;	
+				if (workload >= CHUNKSIZE){
+					workload -= CHUNKSIZE;
+					max = min + CHUNKSIZE;	
 				} else {
 					max = min + workload ;
 					workload = 0;
 				}
 
-				void** sub_args = malloc(sizeof(void*)*n_args);
+				void** sub_args = malloc(sizeof(void*)*(n_args+1));
 				
-				sub_args[0] = (void*) min;
-				sub_args[1] = (void*) max;
+				sub_args[0] = w;
+				sub_args[1] = (void*) min;
+				sub_args[2] = (void*) max;
 
-				for (int k = 2; k < n_args; k++){
-					sub_args[k] = args[k];
+				for (int k = 3; k <= n_args; k++){
+					sub_args[k] = args[k-1];
 				}
 				
-				Task* sub_task = create_task(function, sub_args, n_args);
+				Task* sub_task = create_task(function, sub_args, n_args+1);
 
 				pthread_mutex_lock(&w->task_q->lock);
 				Enqueue(w->task_q, *sub_task);
 				pthread_mutex_unlock(&w->task_q->lock);
 
-				min += STD_DYNAMIC_ALLOC;
+				min += CHUNKSIZE;
 			}
 		}
 	}

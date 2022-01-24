@@ -1,16 +1,18 @@
 #include <pthread.h>
 #include <string.h>
+#include <semaphore.h>
+#include <signal.h>
 #include "mw_types.h"
 #include "../queue/queue.c"
 
-#define STATIC 0
-#define DYNAMIC 1
-#define NONE 2
+#define DEFAULT 0
+#define STATIC 1
 
 Queue* client_q;
 Master* master;
 pthread_t* master_handle;
-int alloc_mode = STATIC;
+int alloc_mode = DEFAULT;
+sem_t client_sem;
 
 #include "worker.c"
 #include "master.c"

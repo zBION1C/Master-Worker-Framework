@@ -20,21 +20,31 @@ void* wait_work (void* worker){
 
 			pthread_mutex_lock(&w->task_q->lock);
 			Dequeue(w->task_q, task);
-			pthread_mutex_unlock(&w->task_q->lock);
+			pthread_mutex_unlock(&w->task_q->lock);				
 
 			void* (*fun)(void**) = task->function;
 			void** args = task->args;
 
-			void* result = fun(args);
+			void* result;
+
+			result = fun(args);
+
+			/* Se dopo l'esecuzione della sottotask il flag di errore del worker e' 1, si riaccoda la task nella coda per una futura esecuzione da parte del worker */
+			if (w->error){
+				printf("Error Worker %d, the task is re-scheduled for future computation.\n", w->id);
+				pthread_mutex_lock(&w->task_q->lock);
+				Enqueue(w->task_q, *(task));
+				pthread_mutex_unlock(&w->task_q->lock);	
+				w->error = 0;
+			}
 
 			send_to_master(result);
-
-		} else { 
-			pthread_mutex_lock(&w->lock);
-			if (w->state != Killed)
-				w->state = Waiting;
-			pthread_mutex_unlock(&w->lock);
 		}
+
+		pthread_mutex_lock(&w->lock);
+		if (w->state != Killed)
+			w->state = Waiting;
+		pthread_mutex_unlock(&w->lock);
 
 		q_size = q->enqueued - q->dequeued;
 		state = w->state;
