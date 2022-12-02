@@ -1,4 +1,5 @@
 # Master-Worker-Framework
+##A C framework.
 A Master-Worker framework written in C for the bruteforce of numeric pins.
 ## Requirements
 - install openssl
